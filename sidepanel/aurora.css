@@ -1,0 +1,767 @@
+/* ============================================================
+   Aurora Glass FX Layer — Auto Solver Side Panel
+   Additive enhancement layer loaded AFTER sidepanel.css.
+   - Animated aurora background + film grain
+   - Conic "aurora" borders (registered @property angle)
+   - Pointer-following spotlight, 3D tilt, magnetic hero buttons
+   - Ripple, sliding tab indicator, toast & progress upgrades
+   - Fully respects prefers-reduced-motion & pauses when hidden
+   ============================================================ */
+
+/* ── Registered properties (enable smooth interpolation) ── */
+@property --aurora-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@property --spot-size {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+:root {
+  --aurora-1: #22d3ee;
+  --aurora-2: #818cf8;
+  --aurora-3: #c084fc;
+  --aurora-4: #f0abfc;
+  --aurora-5: #fbbf24;
+  --aurora-conic: conic-gradient(
+    from var(--aurora-angle),
+    var(--aurora-1), var(--aurora-2), var(--aurora-3),
+    var(--aurora-4), var(--aurora-2), var(--aurora-1)
+  );
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring-soft: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --spot-color: rgba(167, 139, 250, 0.16);
+}
+
+@keyframes auroraSpin { to { --aurora-angle: 360deg; } }
+@keyframes auroraRotate { to { rotate: 1turn; } }
+@keyframes auroraFlow { to { background-position: 200% 0; } }
+
+/* ── 1. Living aurora background + grain ─────────────────── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: -30%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(38% 30% at 20% 18%, rgba(129, 140, 248, 0.20), transparent 70%),
+    radial-gradient(30% 26% at 82% 30%, rgba(34, 211, 238, 0.12), transparent 70%),
+    radial-gradient(36% 30% at 60% 82%, rgba(240, 171, 252, 0.13), transparent 70%),
+    radial-gradient(26% 22% at 12% 78%, rgba(192, 132, 252, 0.12), transparent 70%);
+  animation: auroraDrift 26s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+@keyframes auroraDrift {
+  0%   { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+  50%  { transform: translate3d(4%, -3%, 0) rotate(8deg) scale(1.08); }
+  100% { transform: translate3d(-3%, 4%, 0) rotate(-6deg) scale(1.02); }
+}
+
+/* ── 2. Header: shimmering title + aurora hairline ───────── */
+.header {
+  position: relative;
+  z-index: 5;
+}
+
+.header::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--aurora-2), var(--aurora-1), var(--aurora-4), var(--aurora-2), transparent);
+  background-size: 200% 100%;
+  animation: auroraFlow 7s linear infinite;
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+.header-title {
+  background: linear-gradient(90deg, #ffffff 0%, #d8b4fe 25%, #818cf8 50%, #67e8f9 75%, #ffffff 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: auroraFlow 6s linear infinite;
+}
+
+.header-badge {
+  position: relative;
+  overflow: hidden;
+}
+
+.header-badge::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.55) 50%, transparent 70%);
+  transform: translateX(-120%);
+  animation: auroraBadgeSheen 3.8s var(--ease-out-expo) infinite;
+}
+
+@keyframes auroraBadgeSheen {
+  0%, 60% { transform: translateX(-120%); }
+  100% { transform: translateX(120%); }
+}
+
+.status-dot-pulse {
+  position: relative;
+}
+
+.status-dot-pulse::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid #10b981;
+  animation: auroraPing 2s var(--ease-out-expo) infinite;
+}
+
+@keyframes auroraPing {
+  0% { transform: scale(1); opacity: 0.9; }
+  100% { transform: scale(3.2); opacity: 0; }
+}
+
+.icon-btn {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.35s var(--ease-spring-soft), background 0.25s, border-color 0.25s, box-shadow 0.25s, color 0.25s;
+}
+
+.icon-btn:hover {
+  transform: translateY(-2px) scale(1.06);
+}
+
+.icon-btn:active {
+  transform: scale(0.92);
+  transition-duration: 0.08s;
+}
+
+/* ── 3. Sliding tab indicator ────────────────────────────── */
+.tabs {
+  position: relative;
+  isolation: isolate;
+}
+
+.tab {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  border: 1px solid transparent;
+  transition: color 0.3s, background 0.3s;
+}
+
+.tab-indicator {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 0;
+  width: 0;
+  z-index: 0;
+  border-radius: var(--radius-sm);
+  background:
+    linear-gradient(135deg, rgba(99, 102, 241, 0.38), rgba(192, 132, 252, 0.34)) padding-box,
+    linear-gradient(135deg, rgba(103, 232, 249, 0.7), rgba(192, 132, 252, 0.7), rgba(240, 171, 252, 0.6)) border-box;
+  border: 1px solid transparent;
+  box-shadow: 0 4px 18px rgba(139, 92, 246, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.18);
+  transition: transform 0.5s var(--ease-spring-soft), width 0.5s var(--ease-spring-soft);
+  pointer-events: none;
+}
+
+.tab-indicator.no-anim {
+  transition: none;
+}
+
+.tabs.has-indicator .tab.active {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.tab:active svg {
+  transform: scale(0.85);
+}
+
+/* ── 4. Tab content entrance ─────────────────────────────── */
+.tab-content.active {
+  animation: auroraTabIn 0.5s var(--ease-out-expo) backwards;
+}
+
+@keyframes auroraTabIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); filter: blur(6px); }
+  to   { opacity: 1; transform: none; filter: none; }
+}
+
+/* ── 5. Pointer spotlight on glass surfaces ──────────────── */
+.question-card,
+.reference-box,
+.slide-status-card,
+.slide-settings-card,
+.history-item,
+.toggle-switch-card,
+.settings-card-glow {
+  background-image: radial-gradient(
+    var(--spot-size) circle at var(--spot-x, 50%) var(--spot-y, 50%),
+    var(--spot-color),
+    transparent 100%
+  ) !important;
+  transition: --spot-size 0.45s var(--ease-out-expo), transform 0.35s var(--ease-out-expo),
+              border-color 0.3s, box-shadow 0.3s, background-color 0.3s;
+}
+
+.question-card:hover,
+.reference-box:hover,
+.slide-status-card:hover,
+.slide-settings-card:hover,
+.history-item:hover,
+.toggle-switch-card:hover,
+.settings-card-glow:hover {
+  --spot-size: 220px;
+}
+
+.toggle-switch-card:hover { --spot-size: 120px; }
+
+/* ── 6. Aurora borders (conic, animated) ─────────────────── */
+.btn-hero::before,
+.settings-card-glow::before,
+.question-card::after,
+.slide-status-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: var(--aurora-conic);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  pointer-events: none;
+  animation: auroraSpin 5s linear infinite;
+}
+
+/* Only show on states that matter */
+.question-card::after,
+.slide-status-card::before {
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+
+.settings-card-glow,
+.slide-status-card {
+  position: relative;
+}
+
+.settings-card-glow {
+  border-color: transparent;
+}
+
+.settings-card-glow::before {
+  opacity: 0.65;
+  animation-duration: 8s;
+}
+
+/* ── 7. Hero buttons: magnetic, pointer glow, aurora ring ── */
+.btn-hero {
+  translate: var(--mag-x, 0px) var(--mag-y, 0px);
+  transition: translate 0.35s var(--ease-spring-soft), transform 0.35s var(--ease-spring-soft),
+              box-shadow 0.3s, background 0.3s;
+}
+
+.btn-hero::before {
+  z-index: 1;
+  opacity: 0.85;
+  animation-duration: 4s;
+}
+
+.btn-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  background: radial-gradient(140px circle at var(--spot-x, 50%) var(--spot-y, 50%), rgba(255, 255, 255, 0.32), transparent 60%);
+  opacity: 0;
+  transition: opacity 0.35s;
+  pointer-events: none;
+}
+
+.btn-hero:hover:not(:disabled)::after { opacity: 1; }
+
+.btn-hero:active:not(:disabled) {
+  transform: scale(0.97);
+  transition-duration: 0.08s;
+}
+
+.btn-hero-content {
+  position: relative;
+  z-index: 2;
+}
+
+.btn-hero:disabled::before {
+  opacity: 1;
+  animation-duration: 1.4s;
+}
+
+.btn-hero:hover:not(:disabled) .icon-scan {
+  animation: auroraScanWiggle 0.9s var(--ease-spring-soft);
+}
+
+@keyframes auroraScanWiggle {
+  0%, 100% { transform: rotate(0) scale(1); }
+  30% { transform: rotate(-14deg) scale(1.15); }
+  60% { transform: rotate(10deg) scale(1.05); }
+}
+
+/* Generic buttons: springy press */
+.btn {
+  transition: transform 0.3s var(--ease-spring-soft), box-shadow 0.3s, background 0.3s, color 0.25s, border-color 0.25s;
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.95);
+  transition-duration: 0.08s;
+}
+
+/* Auto All running state → pulsing danger ring */
+#btn-auto-all.btn-danger {
+  animation: auroraDangerPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes auroraDangerPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.55), 0 3px 12px rgba(244, 63, 94, 0.35); }
+  50% { box-shadow: 0 0 0 6px rgba(244, 63, 94, 0), 0 3px 18px rgba(244, 63, 94, 0.5); }
+}
+
+/* ── 8. Ripple ───────────────────────────────────────────── */
+.btn-ref-pill,
+.btn-ref-clear,
+.btn-url-quick,
+.link-btn,
+.toggle-switch-card,
+.open-tab-item {
+  position: relative;
+  overflow: hidden;
+}
+
+.aurora-ripple {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.42) 0%, rgba(196, 181, 253, 0.18) 45%, transparent 70%);
+  transform: scale(0);
+  opacity: 1;
+  animation: auroraRipple 0.65s var(--ease-out-expo) forwards;
+  z-index: 3;
+}
+
+@keyframes auroraRipple {
+  to { transform: scale(1); opacity: 0; }
+}
+
+/* ── 9. Toggle switch micro-interaction (knob squish) ────── */
+.toggle-slider::after {
+  transition: transform 0.35s var(--ease-spring-soft), width 0.2s var(--ease-out-expo);
+}
+
+.toggle-switch-card:active .toggle-slider::after {
+  width: 21px;
+}
+
+.toggle-switch-card:active input:checked ~ .toggle-slider::after,
+.toggle-switch-card:active input:checked + .toggle-slider::after {
+  transform: translateX(11px);
+}
+
+.toggle-switch-card:has(input:focus-visible) {
+  box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 4px rgba(167, 139, 250, 0.85);
+}
+
+/* ── 10. Question cards ──────────────────────────────────── */
+.question-card {
+  animation: auroraCardIn 0.55s var(--ease-out-expo) backwards;
+  transform-style: preserve-3d;
+}
+
+@keyframes auroraCardIn {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); filter: blur(4px); }
+  to   { opacity: 1; transform: none; filter: none; }
+}
+
+.question-card.no-enter {
+  animation: none;
+}
+
+.question-card:hover {
+  transform: perspective(900px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg)) translateY(-2px);
+}
+
+/* Loading → aurora border + glowing number */
+.question-card:has(.spinner)::after {
+  opacity: 1;
+  animation-duration: 2.2s;
+}
+
+.question-card:has(.spinner) .question-number {
+  animation: auroraNumberPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes auroraNumberPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.6); }
+  50% { box-shadow: 0 0 0 6px rgba(139, 92, 246, 0); }
+}
+
+.question-card .loading-text {
+  background: linear-gradient(90deg, #38bdf8 0%, #e0f2fe 45%, #a78bfa 60%, #38bdf8 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: auroraFlow 1.8s linear infinite;
+}
+
+/* Solved → emerald accent bar */
+.question-card:has(.status-done)::before {
+  background: linear-gradient(180deg, #6ee7b7, #10b981);
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.6);
+}
+
+.question-card:has(.status-error)::before {
+  background: linear-gradient(180deg, #fda4af, #f43f5e);
+}
+
+.question-card.just-solved {
+  animation: auroraSolvedGlow 1.3s var(--ease-out-expo);
+}
+
+@keyframes auroraSolvedGlow {
+  0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7), var(--shadow-sm); border-color: rgba(52, 211, 153, 0.9); }
+  100% { box-shadow: 0 0 0 14px rgba(16, 185, 129, 0), var(--shadow-sm); }
+}
+
+.question-card.just-solved .answer-section {
+  animation: auroraReveal 0.7s var(--ease-out-expo) both;
+}
+
+@keyframes auroraReveal {
+  from { clip-path: inset(0 0 100% 0); opacity: 0; transform: translateY(-4px); }
+  to   { clip-path: inset(0 0 0 0); opacity: 1; transform: none; }
+}
+
+.question-card.just-solved .answer-letter-pill {
+  animation: auroraPop 0.6s var(--ease-spring-soft) 0.2s both;
+}
+
+@keyframes auroraPop {
+  from { transform: scale(0.4); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+.question-card.just-failed {
+  animation: auroraShake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+@keyframes auroraShake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(3px); }
+  30%, 50%, 70% { transform: translateX(-5px); }
+  40%, 60% { transform: translateX(5px); }
+}
+
+.question-option {
+  transition: transform 0.25s var(--ease-out-expo), background 0.25s, border-color 0.25s;
+}
+
+.question-option:hover {
+  transform: translateX(3px);
+}
+
+/* Particles */
+.aurora-particle {
+  position: fixed;
+  width: var(--s, 5px);
+  height: var(--s, 5px);
+  border-radius: 50%;
+  background: var(--c, #a78bfa);
+  box-shadow: 0 0 8px var(--c, #a78bfa);
+  pointer-events: none;
+  z-index: 1000;
+  animation: auroraParticle 0.85s var(--ease-out-expo) forwards;
+}
+
+@keyframes auroraParticle {
+  0%   { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0); opacity: 0; }
+}
+
+/* Spinner: conic trail ring */
+.spinner {
+  border: 0;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0 20%, #38bdf8 65%, #c4b5fd);
+  mask: radial-gradient(farthest-side, transparent calc(100% - 2.2px), #000 calc(100% - 1.8px));
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.2px), #000 calc(100% - 1.8px));
+  animation: spin 0.8s linear infinite;
+  vertical-align: -2px;
+}
+
+/* ── 11. Progress bar ────────────────────────────────────── */
+.progress-fill {
+  position: relative;
+  background: linear-gradient(90deg, #6366f1, #8b5cf6, #d946ef, #22d3ee, #6366f1);
+  background-size: 200% 100%;
+  animation: auroraFlow 2.4s linear infinite;
+  transition: width 0.6s var(--ease-out-expo);
+}
+
+.progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.9));
+  filter: blur(1px);
+  border-radius: inherit;
+}
+
+/* ── 12. Settings drawer choreography ────────────────────── */
+.settings-panel:not(.hidden) {
+  animation: auroraSheetIn 0.45s var(--ease-out-expo) both;
+}
+
+@keyframes auroraSheetIn {
+  from { opacity: 0; backdrop-filter: blur(0); }
+  to   { opacity: 1; }
+}
+
+.settings-panel:not(.hidden) .settings-card-glow {
+  animation: auroraSettingsCard 0.55s var(--ease-spring-soft) both;
+}
+
+@keyframes auroraSettingsCard {
+  from { opacity: 0; transform: translateY(-14px) scale(0.96); }
+  to   { opacity: 1; transform: none; }
+}
+
+.settings-panel:not(.hidden) .form-group,
+.settings-panel:not(.hidden) .settings-footer {
+  animation: auroraRise 0.5s var(--ease-out-expo) both;
+}
+
+.settings-panel:not(.hidden) .form-group:nth-of-type(1) { animation-delay: 0.06s; }
+.settings-panel:not(.hidden) .form-group:nth-of-type(2) { animation-delay: 0.10s; }
+.settings-panel:not(.hidden) .form-group:nth-of-type(3) { animation-delay: 0.14s; }
+.settings-panel:not(.hidden) .form-group:nth-of-type(4) { animation-delay: 0.18s; }
+.settings-panel:not(.hidden) .form-group:nth-of-type(5) { animation-delay: 0.22s; }
+.settings-panel:not(.hidden) .form-group:nth-of-type(6) { animation-delay: 0.26s; }
+.settings-panel:not(.hidden) .form-group:nth-of-type(7) { animation-delay: 0.30s; }
+.settings-panel:not(.hidden) .settings-footer { animation-delay: 0.34s; }
+
+@keyframes auroraRise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.settings-panel:not(.hidden) ~ .tab-content.active {
+  filter: blur(2px) saturate(0.8);
+  transition: filter 0.4s;
+}
+
+/* Inputs: aurora focus underline glow */
+input[type="text"],
+input[type="password"],
+input[type="url"],
+select.input-select,
+textarea {
+  transition: border-color 0.25s, box-shadow 0.35s var(--ease-out-expo), background 0.25s;
+}
+
+/* ── 13. Slide tab HUD ───────────────────────────────────── */
+.slide-status-card:has(.slide-badge.running)::before,
+.slide-status-card:has(.slide-badge.quiz)::before {
+  opacity: 1;
+}
+
+.slide-status-card:has(.slide-badge.quiz)::before {
+  --aurora-1: #fbbf24;
+  --aurora-2: #f59e0b;
+  --aurora-3: #fde68a;
+  --aurora-4: #fb923c;
+}
+
+.slide-status-card:has(.slide-badge.done) {
+  border-color: rgba(16, 185, 129, 0.45);
+  box-shadow: 0 0 22px rgba(16, 185, 129, 0.18), var(--shadow-sm);
+}
+
+.slide-counter {
+  display: inline-block;
+  transition: transform 0.35s var(--ease-spring-soft);
+}
+
+.slide-counter.bump {
+  animation: auroraPop 0.45s var(--ease-spring-soft);
+}
+
+.slide-log-container {
+  background-image: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 3px);
+}
+
+.slide-log-item {
+  animation: auroraLogIn 0.4s var(--ease-out-expo) both;
+}
+
+@keyframes auroraLogIn {
+  from { opacity: 0; transform: translateX(-10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.terminal-dot {
+  animation: pulseDot 1.6s ease-in-out infinite;
+}
+
+/* ── 14. History items ───────────────────────────────────── */
+.history-item {
+  animation: auroraRise 0.45s var(--ease-out-expo) backwards;
+}
+
+.history-item:hover {
+  transform: perspective(900px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg)) translateY(-2px);
+}
+
+/* ── 15. Empty state: orbital ring ───────────────────────── */
+.empty-icon-wrapper::before,
+.empty-icon-wrapper::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.empty-icon-wrapper::before {
+  border: 1px dashed rgba(167, 139, 250, 0.35);
+  animation: auroraRotate 18s linear infinite;
+}
+
+.empty-icon-wrapper::after {
+  background: radial-gradient(circle at 50% 0%, #c4b5fd 0 2.5px, transparent 3.5px),
+              radial-gradient(circle at 50% 100%, #67e8f9 0 2px, transparent 3px);
+  animation: auroraRotate 5s linear infinite;
+}
+
+/* ── 16. Toasts ──────────────────────────────────────────── */
+.toast {
+  position: relative;
+  overflow: hidden;
+  padding: 10px 16px 12px;
+  border-radius: 14px;
+  background: rgba(17, 20, 34, 0.82);
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), 0 0 22px rgba(139, 92, 246, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  animation: auroraToastIn 0.55s var(--ease-spring-soft) both,
+             auroraToastOut 0.35s cubic-bezier(0.4, 0, 1, 1) 2.05s forwards;
+}
+
+.toast::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: 100%;
+  background: linear-gradient(90deg, var(--aurora-1), var(--aurora-3), var(--aurora-4));
+  transform-origin: left;
+  animation: auroraToastTimer 2.4s linear forwards;
+}
+
+@keyframes auroraToastIn {
+  from { opacity: 0; transform: translateY(18px) scale(0.88); filter: blur(6px); }
+  to   { opacity: 1; transform: none; filter: none; }
+}
+
+@keyframes auroraToastOut {
+  to { opacity: 0; transform: translateY(8px) scale(0.94); filter: blur(4px); }
+}
+
+@keyframes auroraToastTimer {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+
+/* ── 17. Focus, scrollbar, selection ─────────────────────── */
+:is(button, a, [role="button"]):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 4px rgba(167, 139, 250, 0.9) !important;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(129, 140, 248, 0.35), rgba(192, 132, 252, 0.35));
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(129, 140, 248, 0.7), rgba(192, 132, 252, 0.7));
+}
+
+::selection {
+  background: rgba(139, 92, 246, 0.45);
+  color: #fff;
+}
+
+/* ── 18. Performance: pause when panel hidden ────────────── */
+html.aurora-paused *,
+html.aurora-paused *::before,
+html.aurora-paused *::after {
+  animation-play-state: paused !important;
+}
+
+/* ── 19. Reduced motion ──────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Keep busy indicators alive but slow, so users still see activity */
+  .spinner {
+    animation-duration: 3s !important;
+    animation-iteration-count: infinite !important;
+  }
+
+  .question-card:hover,
+  .history-item:hover {
+    transform: none;
+  }
+
+  .btn-hero {
+    translate: none;
+  }
+}

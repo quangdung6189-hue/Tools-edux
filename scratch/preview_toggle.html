@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Preview Toggle Switches</title>
+  <link rel="stylesheet" href="../sidepanel/sidepanel.css">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      background: #090b10;
+      padding: 30px;
+      display: flex;
+      justify-content: center;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    .preview-card {
+      width: 380px;
+      background: #111422;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    }
+    .preview-section-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #cbd5e1;
+      margin-bottom: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .divider {
+      height: 1px;
+      background: rgba(255, 255, 255, 0.08);
+      margin: 20px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="preview-card">
+    <div class="preview-section-title">⚙️ Cài đặt (Settings Modal Switches)</div>
+
+    <div class="form-group">
+      <label class="toggle-switch-card" for="toggle-floating-bar">
+        <input type="checkbox" id="toggle-floating-bar" checked>
+        <span class="toggle-text">⚡ Thanh công cụ nổi trên web (Floating Bar)</span>
+        <span class="toggle-slider"></span>
+      </label>
+      <span class="help-text">Hiện thanh điều khiển nổi trực tiếp trên trang slide & bài tập để thao tác nhanh</span>
+    </div>
+
+    <div class="form-group">
+      <label class="toggle-switch-card" for="toggle-web-grounding">
+        <input type="checkbox" id="toggle-web-grounding" checked>
+        <span class="toggle-text">🌐 Tra cứu mở rộng (Academic Grounding)</span>
+        <span class="toggle-slider"></span>
+      </label>
+      <span class="help-text">Tự động tìm kiếm tài liệu học thuật bên ngoài đối chiếu lý thuyết & triệt tiêu ảo giác</span>
+    </div>
+
+    <div class="form-group">
+      <label class="toggle-switch-card" for="toggle-auto-clear">
+        <input type="checkbox" id="toggle-auto-clear">
+        <span class="toggle-text">🧹 Tự động xóa bài cũ khi giải xong (Tắt)</span>
+        <span class="toggle-slider"></span>
+      </label>
+      <span class="help-text">Tự động dọn dẹp câu hỏi và tài liệu trang sau khi giải xong để sẵn sàng làm bài mới</span>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="preview-section-title">🛠️ Thanh công cụ (Solver Toolbar Pills)</div>
+    <div class="solver-toolbar" style="display: flex; gap: 8px;">
+      <label class="toggle-switch-card speed-toggle" title="Siêu tốc">
+        <input type="checkbox" id="toggle-fast-mode" checked>
+        <span class="toggle-slider"></span>
+        <span class="toggle-text">⚡ Siêu tốc</span>
+      </label>
+      <label class="toggle-switch-card">
+        <input type="checkbox" id="toggle-auto-next" checked>
+        <span class="toggle-slider"></span>
+        <span class="toggle-text">Auto chuyển</span>
+      </label>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="preview-section-title">📑 Tự động hóa Slide (Slide Settings Rows)</div>
+    <div class="slide-settings-card">
+      <div class="slide-config-row">
+        <label class="toggle-switch-card slide-quiz-toggle" for="toggle-slide-auto-quiz">
+          <input type="checkbox" id="toggle-slide-auto-quiz" checked>
+          <span class="toggle-text">Tự động giải câu hỏi trên lớp</span>
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="slide-config-row">
+        <label class="toggle-switch-card" for="toggle-slide-floating-bar">
+          <input type="checkbox" id="toggle-slide-floating-bar">
+          <span class="toggle-text">⚡ Hiện thanh nổi trên web (Tắt)</span>
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

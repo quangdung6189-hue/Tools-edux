@@ -1,0 +1,483 @@
+/* ============================================================
+   AHS Floating Toolbar (Thanh công cụ nổi tương tác trên trang)
+   Designed with Glassmorphism, Dark Mode & Micro-animations
+   ============================================================ */
+
+:host {
+  all: initial;
+  position: fixed;
+  z-index: 2147483647;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #f1f5f9;
+  user-select: none;
+  pointer-events: none;
+}
+
+:host *, .ahs-dock *, .ahs-mini-bar * {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* Floating Dock Container */
+.ahs-dock {
+  pointer-events: auto;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 320px;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  border-radius: 16px;
+  box-shadow: 0 16px 40px -8px rgba(0, 0, 0, 0.65), 0 0 20px rgba(99, 102, 241, 0.18);
+  transition: box-shadow 0.25s ease, border-color 0.25s ease, opacity 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+.ahs-dock:hover {
+  border-color: rgba(168, 85, 247, 0.55);
+  box-shadow: 0 20px 48px -8px rgba(0, 0, 0, 0.75), 0 0 28px rgba(168, 85, 247, 0.25);
+}
+
+/* Header & Drag Grip */
+.ahs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: rgba(30, 41, 59, 0.6);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: grab;
+}
+
+.ahs-header:active {
+  cursor: grabbing;
+}
+
+.ahs-brand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.ahs-logo-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  font-size: 13px;
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.5);
+}
+
+.ahs-brand-name {
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.2px;
+  background: linear-gradient(135deg, #ffffff, #cbd5e1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ahs-pro-pill {
+  font-size: 9px;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #ec4899, #8b5cf6);
+  color: #fff;
+  -webkit-text-fill-color: initial;
+  letter-spacing: 0.5px;
+}
+
+.ahs-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ahs-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ahs-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.ahs-drag-grip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 24px;
+  color: #64748b;
+  font-size: 14px;
+  cursor: grab;
+  user-select: none;
+}
+
+/* Body Content */
+.ahs-body {
+  padding: 12px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Status Strip */
+.ahs-status-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ahs-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(100, 116, 139, 0.2);
+  color: #94a3b8;
+  border: 1px solid rgba(100, 116, 139, 0.3);
+  transition: all 0.25s ease;
+}
+
+.ahs-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #94a3b8;
+  display: inline-block;
+}
+
+/* Status badge variants */
+.ahs-status-badge.running {
+  background: rgba(59, 130, 246, 0.18);
+  color: #60a5fa;
+  border-color: rgba(59, 130, 246, 0.4);
+}
+.ahs-status-badge.running .ahs-dot {
+  background: #3b82f6;
+  box-shadow: 0 0 8px #3b82f6;
+  animation: ahs-blink 1.2s infinite;
+}
+
+.ahs-status-badge.quiz {
+  background: rgba(16, 185, 129, 0.18);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.4);
+}
+.ahs-status-badge.quiz .ahs-dot {
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+  animation: ahs-blink 1.2s infinite;
+}
+
+.ahs-status-badge.solving {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.4);
+}
+.ahs-status-badge.solving .ahs-dot {
+  background: #f59e0b;
+  box-shadow: 0 0 8px #f59e0b;
+  animation: ahs-blink 0.9s infinite;
+}
+
+.ahs-counter-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.07);
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Action Buttons */
+.ahs-actions-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.ahs-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.ahs-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.1);
+}
+
+.ahs-btn:active {
+  transform: translateY(0);
+  filter: brightness(0.95);
+}
+
+.ahs-btn-primary {
+  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(124, 58, 237, 0.35);
+}
+
+.ahs-btn-stop {
+  background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+  color: #fff !important;
+  box-shadow: 0 2px 10px rgba(239, 68, 68, 0.4) !important;
+  animation: ahs-subtle-glow 2s infinite;
+}
+
+.ahs-btn-success {
+  background: linear-gradient(135deg, #059669, #10b981);
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(16, 185, 129, 0.3);
+}
+
+.ahs-btn-secondary {
+  grid-column: span 2;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #cbd5e1;
+}
+
+.ahs-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.13);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.ahs-btn-icon {
+  font-size: 13px;
+}
+
+/* Quick Controls Row */
+.ahs-controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  gap: 8px;
+}
+
+.ahs-control-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ahs-label {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.ahs-select {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #f1f5f9;
+  border-radius: 6px;
+  font-size: 11px;
+  padding: 2px 4px;
+  outline: none;
+  cursor: pointer;
+}
+
+.ahs-select:focus {
+  border-color: #8b5cf6;
+}
+
+.ahs-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.ahs-toggle-label input {
+  display: none;
+}
+
+.ahs-toggle-switch {
+  width: 26px;
+  height: 14px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.2);
+  position: relative;
+  transition: background-color 0.2s ease;
+}
+
+.ahs-toggle-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s ease;
+}
+
+.ahs-toggle-label input:checked + .ahs-toggle-switch {
+  background: #8b5cf6;
+}
+
+.ahs-toggle-label input:checked + .ahs-toggle-switch::after {
+  transform: translateX(12px);
+}
+
+.ahs-toggle-text {
+  font-weight: 500;
+}
+
+/* Activity Ticker (1-line live log) */
+.ahs-ticker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  font-size: 11px;
+}
+
+.ahs-ticker-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.ahs-ticker-text {
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+/* Mini Bar Mode (Collapsed Pill) */
+.ahs-mini-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: rgba(15, 23, 42, 0.94);
+  cursor: grab;
+}
+
+.ahs-mini-bar:active {
+  cursor: grabbing;
+}
+
+.ahs-mini-logo {
+  font-size: 13px;
+}
+
+.ahs-mini-counter {
+  font-size: 11px;
+  font-weight: 700;
+  color: #cbd5e1;
+  margin-right: 2px;
+}
+
+.ahs-mini-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  color: #fff;
+  border: none;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ahs-mini-btn:hover {
+  transform: scale(1.08);
+}
+
+.ahs-mini-btn-stop {
+  background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+}
+
+.ahs-mini-btn-solve {
+  background: linear-gradient(135deg, #059669, #10b981);
+}
+
+.ahs-mini-expand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #94a3b8;
+  font-size: 14px;
+  cursor: pointer;
+  margin-left: 2px;
+}
+
+.ahs-mini-expand:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+/* Animations */
+@keyframes ahs-blink {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+@keyframes ahs-subtle-glow {
+  0%, 100% { box-shadow: 0 0 10px rgba(239, 68, 68, 0.4); }
+  50% { box-shadow: 0 0 18px rgba(239, 68, 68, 0.7); }
+}
