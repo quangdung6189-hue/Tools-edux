@@ -213,37 +213,8 @@
     return paired;
   }
 
-  // ── Fill verification helper ─────────────────────────────────
-  // React SPAs hay nuốt sự kiện click/input — phải poll DOM xác nhận trạng thái thật
-  // đã thay đổi trước khi báo success, nếu không Auto sẽ chuyển câu khi điền chưa ăn.
-  async function waitForInputState(el, predicate, timeoutMs = 700) {
-    const start = Date.now();
-    const getInput = () => {
-      if (!el || !el.tagName) return null;
-      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') return el;
-      if (el.control && el.control.tagName === 'INPUT') return el.control;
-      try {
-        return el.querySelector?.('input[type="radio"], input[type="checkbox"], input:not([type]), textarea, select') || null;
-      } catch (_) {
-        return null;
-      }
-    };
-
-    // Không tìm thấy input liên quan (option tùy chỉnh không có input) → không xác minh được,
-    // giữ hành vi cũ: coi như thành công (best-effort).
-    if (!getInput()) return true;
-
-    while (Date.now() - start < timeoutMs) {
-      try {
-        if (predicate(getInput())) return true;
-      } catch (_) {}
-      await new Promise(r => setTimeout(r, 70));
-    }
-    return false;
-  }
-
   // ── Fill Multiple Choice ─────────────────────────────────────────
-  async function fillMultipleChoice(inputs, options, answerText, answerLetter) {
+  function fillMultipleChoice(inputs, options, answerText, answerLetter) {
     let letter = answerLetter;
     if (!letter && answerText) {
       letter = typeof extractAnswerLetter === 'function' ? extractAnswerLetter(answerText) : '';
@@ -275,30 +246,14 @@
       }
     }
 
-    // 3. Click target if found in inputs — XÁC MINH click được ghi nhận trước khi báo success
+    // 3. Click target if found in inputs
     if (targetIndex >= 0 && inputs && targetIndex < inputs.length) {
-      const el = inputs[targetIndex];
-      const expectedLetter = String.fromCharCode(65 + targetIndex);
-
       if (typeof clickOptionElement === 'function') {
-        clickOptionElement(el);
+        clickOptionElement(inputs[targetIndex]);
       } else {
-        executeBulletproofClick(el);
+        executeBulletproofClick(inputs[targetIndex]);
       }
-
-      // React SPA có thể nuốt click lần 1 — poll xem input thật sự được check chưa
-      if (await waitForInputState(el, (inp) => inp.checked)) {
-        return { success: true, filled: expectedLetter };
-      }
-
-      // Thử lại lần 2 với bulletproof click
-      executeBulletproofClick(el);
-      if (await waitForInputState(el, (inp) => inp.checked)) {
-        return { success: true, filled: expectedLetter };
-      }
-
-      console.warn(`[AutoSolver Fill] Click phương án ${expectedLetter} không được trang ghi nhận sau 2 lần thử.`);
-      return { error: `Click phương án ${expectedLetter} không được ghi nhận (đã thử 2 lần).` };
+      return { success: true, filled: String.fromCharCode(65 + targetIndex) };
     }
 
     // 4. Fallback: Search directly on page by letter (A, B, C, D) if inputs didn't match
@@ -327,91 +282,55 @@
   }
 
   // ── Fill Multiple Select (checkboxes) ────────────────────────────
-  async function fillMultipleSelect(inputs, options, answerText, answerLetter) {
+  function fillMultipleSelect(inputs, options, answerText, answerLetter) {
     if (!inputs || inputs.length === 0) {
       return { error: 'Không tìm thấy input element.' };
     }
 
     const filled = [];
-    const failedLetters = [];
 
     if (answerLetter) {
       const letters = answerLetter.split(/[,\s]+/).map(l => l.trim().toUpperCase());
       for (const letter of letters) {
         const index = letter.charCodeAt(0) - 65;
         if (index >= 0 && index < inputs.length) {
-          const el = inputs[index];
           if (typeof clickOptionElement === 'function') {
-            clickOptionElement(el);
+            clickOptionElement(inputs[index]);
           } else {
-            executeBulletproofClick(el);
+            executeBulletproofClick(inputs[index]);
           }
-
-          if (await waitForInputState(el, (inp) => inp.checked)) {
-            filled.push(letter);
-          } else {
-            executeBulletproofClick(el);
-            if (await waitForInputState(el, (inp) => inp.checked)) {
-              filled.push(letter);
-            } else {
-              failedLetters.push(letter);
-            }
-          }
+          filled.push(letter);
         }
       }
     }
 
-    if (filled.length > 0 && failedLetters.length === 0) {
-      return { success: true, filled: filled.join(', ') };
-    }
     if (filled.length > 0) {
-      return { error: `Chỉ điền được ${filled.join(', ')}, các phương án ${failedLetters.join(', ')} không được trang ghi nhận.` };
+      return { success: true, filled: filled.join(', ') };
     }
 
     return { error: 'Không thể tìm đáp án phù hợp để điền.' };
   }
 
   // ── Fill Dropdown ────────────────────────────────────────────────
-  async function fillDropdown(select, options, answerText, answerLetter) {
+  function fillDropdown(select, options, answerText, answerLetter) {
     if (!select) {
       return { error: 'Không tìm thấy dropdown.' };
     }
 
-    const applySelect = (target, setter) => {
-      setter(target);
-      target.dispatchEvent(new Event('change', { bubbles: true }));
-    };
-
-    const verifySelected = async (target, expectedValue, timeoutMs = 700) => {
-      return await waitForInputState(target, (inp) => inp.selectedIndex > 0 && (!expectedValue || inp.value === expectedValue), timeoutMs);
-    };
-
     if (answerLetter) {
       const index = answerLetter.charCodeAt(0) - 65;
       if (index >= 0 && index < select.options.length) {
-        applySelect(select, (s) => { s.selectedIndex = index; });
-        if (await verifySelected(select, select.options[index].value)) {
-          return { success: true, filled: select.options[index].text };
-        }
-        applySelect(select, (s) => { s.selectedIndex = index; });
-        if (await verifySelected(select, select.options[index].value)) {
-          return { success: true, filled: select.options[index].text };
-        }
-        return { error: `Dropdown không ghi nhận lựa chọn ${answerLetter}.` };
+        select.selectedIndex = index;
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+        return { success: true, filled: select.options[index].text };
       }
     }
 
     for (const option of select.options) {
       if (option.text.toLowerCase().includes(answerText.toLowerCase())) {
-        applySelect(select, (s) => { s.value = option.value; });
-        if (await verifySelected(select, option.value)) {
-          return { success: true, filled: option.text };
-        }
-        applySelect(select, (s) => { s.value = option.value; });
-        if (await verifySelected(select, option.value)) {
-          return { success: true, filled: option.text };
-        }
-        return { error: 'Dropdown không ghi nhận lựa chọn theo nội dung.' };
+        select.value = option.value;
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+        return { success: true, filled: option.text };
       }
     }
 
@@ -467,9 +386,10 @@
   }
 
   // ── Fill Text Input ──────────────────────────────────────────────
-  // ── Fill Text Input ──────────────────────────────────────────────
-  async function fillTextInput(inputs, answerText) {
-    if (!inputs || inputs.length === 0) {
+  function fillTextInput(inputs, answerText) {
+    if (typeof answerText !== 'string' || !answerText.trim()) return { error: 'AI chưa trả lời câu hỏi.' };
+    inputs = Array.from(inputs || []).filter(el => el?.isConnected && !el.disabled && !el.readOnly);
+    if (inputs.length === 0) {
       return { error: 'Không tìm thấy ô nhập liệu.' };
     }
 
@@ -489,52 +409,30 @@
       target.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
     }
 
-    // Xác minh giá trị thật sự được giữ trong DOM (React controlled input có thể reset lại)
-    const verifyValue = async (target, expected, timeoutMs = 600) => {
-      return await waitForInputState(target, (inp) => (inp.value || '').trim() === expected, timeoutMs);
-    };
-
-    const retrySet = async (target, value) => {
-      setInputValue(target, value);
-      if ((target.value || '').trim() === value) return true;
-      if (await verifyValue(target, value)) return true;
-      // React reset giá trị → set lại lần 2 rồi poll
-      setInputValue(target, value);
-      return await verifyValue(target, value);
-    };
-
     const firstTarget = inputs[0];
     const isSingleLine = firstTarget.tagName === 'INPUT';
 
     if (inputs.length === 1) {
       const cleanValue = isSingleLine ? cleanFillInTheBlankAnswer(answerText) : answerText.trim();
-      if (await retrySet(firstTarget, cleanValue)) {
-        return { success: true, filled: cleanValue };
-      }
-      return { error: 'Trang không ghi nhận nội dung đã điền (thử 2 lần).' };
+      setInputValue(firstTarget, cleanValue);
+       return firstTarget.value === cleanValue && cleanValue ? { success: true, filled: cleanValue } : { error: 'Ô nhập không nhận đáp án.' };
     }
 
     // If multiple inputs on the page
     const cleanLines = answerText.split('\n').map(l => cleanFillInTheBlankAnswer(l)).filter(Boolean);
     const filledValues = [];
-    const failedIdx = [];
-    for (let idx = 0; idx < inputs.length; idx++) {
-      const input = inputs[idx];
+    inputs.forEach((input, idx) => {
       const isInputSingleLine = input.tagName === 'INPUT';
       const val = isInputSingleLine
         ? ((idx < cleanLines.length) ? cleanLines[idx] : cleanFillInTheBlankAnswer(answerText))
         : answerText.trim();
-      if (await retrySet(input, val)) {
-        filledValues.push(val);
-      } else {
-        failedIdx.push(idx + 1);
-      }
-    }
+      setInputValue(input, val);
+      filledValues.push(val);
+    });
 
-    if (failedIdx.length === 0) {
-      return { success: true, filled: filledValues.join(', ') };
-    }
-    return { error: `Trang không ghi nhận nội dung ở ô nhập thứ ${failedIdx.join(', ')}.` };
+     return inputs.every((input, idx) => input.value === filledValues[idx] && filledValues[idx])
+       ? { success: true, filled: filledValues.join(', ') }
+       : { error: 'Một số ô nhập không nhận đáp án.' };
   }
 
   // ── Parse True/False Statements Answer ───────────────────────────
@@ -891,7 +789,8 @@
     const isTFFromQuestion = questionType === 'true-false' || (question.statements && question.statements.length > 0);
     const isTFFromQuestionText = typeof question.questionText === 'string' &&
       /đúng[\s\/\-]*sai|cho\s+từng\s+mệnh\s+đề|các\s+phát\s+biểu|mỗi\s+nhận\s+định|xem\s+xét\s+các|true[\s\/\-]*false/i.test(question.questionText);
-    const isTFQuestion = isTFFromQuestion || isTFFromAnswer || isTFFromQuestionText;
+    const isTextQuestion = ['text', 'short-answer', 'fill-in-the-blank'].includes(questionType);
+    const isTFQuestion = isTFFromQuestion || (!isTextQuestion && (isTFFromAnswer || isTFFromQuestionText));
 
     console.log(`[AutoSolver Fill] TF detection: fromQuestion=${isTFFromQuestion}, fromAnswer=${isTFFromAnswer}, fromQuestionText=${isTFFromQuestionText}, final=${isTFQuestion}`);
 
@@ -921,8 +820,10 @@
       return fillMultipleSelect(inputElements, options, answerText, answerLetter);
     } else if (questionType === 'dropdown') {
       return fillDropdown(inputElements[0], options, answerText, answerLetter);
-    } else if (questionType === 'text' || questionType === 'short-answer' || questionType === 'fill-in-the-blank') {
-      return fillTextInput(inputElements, answerText);
+    } else if (isTextQuestion) {
+      const liveInputs = inputElements?.length ? inputElements : Array.from(document.querySelectorAll('textarea, input[type="text"], input:not([type])'))
+        .filter(el => !el.closest('[class*="ahs-"], [id*="ahs-"]') && el.getClientRects().length);
+      return fillTextInput(liveInputs, answerText);
     }
 
     // ── SAFETY NET: Even for unknown question types, check if answer looks like TF ──

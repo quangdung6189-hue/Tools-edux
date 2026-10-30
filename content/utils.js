@@ -253,13 +253,16 @@ var slideStatus = window.__ahs_slideStatus || 'idle';
       }
     }
 
+    // Never classify a text editor as multiple-choice using unrelated page buttons.
+    const hasNearbyEditor = [headerBlock?.parentElement, headerEl?.parentElement?.parentElement]
+      .some(scope => scope && scope !== document.body && scope.querySelector('textarea, input[type="text"], input:not([type])'));
     // Global fallback for options
-    if (!optionData || optionData.options.length < 2) {
+    if ((!optionData || optionData.options.length < 2) && !hasNearbyEditor) {
       optionData = extractOptionsFromContainer(document.body);
     }
 
     // Active hunt fallback if still < 2 options
-    if (!optionData || optionData.options.length < 2) {
+    if ((!optionData || optionData.options.length < 2) && !hasNearbyEditor) {
       optionData = huntOptionsOnPage(headerEl);
     }
 
@@ -334,12 +337,16 @@ var slideStatus = window.__ahs_slideStatus || 'idle';
       if (cleaned.declaredType === 'multiple-choice' || cleaned.declaredType === 'multiple-select' || /trắc\s*nghiệm/i.test(rawQuestionText)) {
         questionType = cleaned.declaredType || 'multiple-choice';
       } else {
-        const textarea = container ? container.querySelector('textarea') : null;
-        const textInput = container ? container.querySelector('input[type="text"]') : null;
+         // Header-only containers are common on paginated LMS pages: editor lives
+         // in the next sibling, not inside the question heading.
+         const editorScope = [container, headerBlock?.parentElement, headerEl?.parentElement?.parentElement]
+           .find(scope => scope && scope !== document.body && scope.querySelector('textarea, input[type="text"], input:not([type])'));
+         const textarea = editorScope?.querySelector('textarea');
+         const textInput = editorScope?.querySelector('input[type="text"], input:not([type])');
         if (textarea) {
           questionType = 'text';
           inputElements.push(textarea);
-        } else if (textInput) {
+         } else if (textInput) {
           questionType = 'short-answer';
           inputElements.push(textInput);
         } else {
@@ -2341,25 +2348,8 @@ var slideStatus = window.__ahs_slideStatus || 'idle';
 // Extract letter helper ──────────────────────────────────
   function extractAnswerLetter(text) {
     if (!text) return '';
-    const clean = text.trim();
-
-    // AI có khi trả lời nhiều dòng (quá trình + kết luận) — ưu tiên dòng CUỐI (dòng kết luận)
-    // trước khi quét toàn bộ, tránh nhặt nhầm chữ cái được nhắc trong phần phân tích phía trên.
-    const lines = clean.split('\n').map(l => l.trim()).filter(Boolean);
-    const candidates = lines.length > 1 ? [lines[lines.length - 1], clean] : [clean];
-
-    for (const t of candidates) {
-      const m = t.match(/^(?:\*\*|\*|)?(?:đáp\s*án\s*[\:\.]*|[\[\(])?\s*([A-D](?:\s*,\s*[A-D])*)(?=$|[\.\:\)\s,\]])/i) ||
-                t.match(/\b(?:đáp\s*án|chọn)\s*[\:\.]*\s*([A-D](?:\s*,\s*[A-D])*)\b/i);
-      if (m) return m[1].toUpperCase();
-    }
-
-    // Fallback: quét từng dòng TỪ DƯỚI LÊN — dòng cuối gần như luôn là kết luận
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const m = lines[i].match(/(?:^|[\s\(\[])([A-D])(?:$|[\s\.\,\)\]:])/);
-      if (m) return m[1].toUpperCase();
-    }
-    return '';
+    const match = text.match(/^(?:đáp\s*án\s*[\:\.]*|[\[\(])?\s*([A-D])[\.\:\)\s]/i) || text.match(/\b([A-D])\b/);
+    return match ? match[1].toUpperCase() : '';
   }
 
   

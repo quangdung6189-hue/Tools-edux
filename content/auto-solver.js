@@ -65,14 +65,17 @@
   }
 
   // ── Wait for question DOM to transition ──────────────────────
-  async function waitForNextQuestion(previousText, maxWaitMs = 5000) {
+  async function waitForNextQuestion(previousText, maxWaitMs = 6000) {
     const start = Date.now();
     let bestResponse = null;
 
-    const cleanPrev = (previousText || '')
+    const normalize = (txt) => (txt || '')
       .replace(/^(?:câu|question)\s*\d+[\s\:\.\-]*/i, '')
       .replace(/^[:\s]+/, '')
-      .substring(0, 40).trim().toLowerCase();
+      .replace(/\s+/g, ' ')
+      .trim().toLowerCase();
+
+    const cleanPrev = normalize(previousText);
 
     while (Date.now() - start < maxWaitMs) {
       if (!isAutoSolverRunning) return null;
@@ -84,36 +87,23 @@
           const counter = typeof getPageCounter === 'function' ? getPageCounter(questions) : null;
           bestResponse = { questions, counter };
 
-          const cleanCurr = (q.questionText || '')
-            .replace(/^(?:câu|question)\s*\d+[\s\:\.\-]*/i, '')
-            .replace(/^[:\s]+/, '')
-            .substring(0, 40).trim().toLowerCase();
+          const cleanCurr = normalize(q.questionText || '');
 
-          const isSameQuestion = previousText && cleanPrev && cleanCurr && cleanPrev === cleanCurr;
-          if (isSameQuestion) {
+          // Check if this is still the previous question
+          const isSameText = cleanPrev && cleanCurr && (cleanPrev === cleanCurr || (cleanPrev.length > 70 && cleanCurr.startsWith(cleanPrev.slice(0, 70))));
+
+          // Never solve the previous question again while navigation is pending.
+          if (isSameText) {
             await sleep(200);
             continue;
           }
 
-          const isTF = q.questionType === 'true-false' ||
-            /đúng[\s\/\-]*sai|cho\s+từng\s+mệnh\s+đề|các\s+phát\s+biểu|tính\s+chất\s+của/i.test(q.questionText || '');
-          const isChoice = q.questionType === 'multiple-choice' || q.questionType === 'multiple-select';
+          // If question has options or statements or is a text question, return immediately
+          const hasOptions = q.options && q.options.length >= 2;
+          const hasStatements = q.statements && q.statements.length >= 2;
+          const isTextQ = q.questionType === 'fill-in-the-blank' || q.questionType === 'short-answer';
 
-          if (isTF) {
-            const hasRealOptions = q.options && q.options.length >= 2 && !isOnlyTrueFalseWords(q.options);
-            const hasStatements = q.statements && q.statements.length >= 2;
-            if (hasRealOptions || hasStatements) {
-              return bestResponse;
-            }
-            await sleep(200);
-            continue;
-          } else if (isChoice) {
-            if (q.options && q.options.length >= 2) {
-              return bestResponse;
-            }
-            await sleep(200);
-            continue;
-          } else {
+          if (hasOptions || hasStatements || isTextQ || (Date.now() - start > 800)) {
             return bestResponse;
           }
         }
@@ -122,7 +112,7 @@
       await sleep(200);
     }
 
-    return bestResponse;
+    return null;
   }
 
   // ── Main Background Auto Solver Engine ───────────────────────
@@ -134,7 +124,7 @@
     isAutoSolverRunning = true;
     window.__ahs_isAutoSolverRunning = true;
     currentSolverConfig = {
-      autoNext: config.autoNext !== false,
+      autoNext: true, // Auto All always auto-navigates
       fastMode: config.fastMode !== false,
       refContext: config.refContext || ''
     };
@@ -160,7 +150,7 @@
 
   async function runSolverLoop() {
     let consecutiveErrors = 0;
-    const MAX_ERRORS = 4;
+    const MAX_ERRORS = 8;
     let processedCount = 0;
     let lastProcessedText = '';
     let totalQuestions = 40;
@@ -193,18 +183,12 @@
           message: `Đang giải câu ${idx + 1}/${totalQuestions}...`
         });
 
-        await solveAndFillSpecific(idx, q, currentSolverConfig).then(solveRes => {
-          if (solveRes?.success) {
-            processedCount++;
-          } else {
-            broadcastProgress({
-              status: 'warn',
-              current: idx + 1,
-              total: totalQuestions,
-              message: `⚠️ Câu ${idx + 1} chưa điền được: ${solveRes?.error || 'không rõ lý do'}`
-            });
-          }
-        });
+        const result = await solveAndFillSpecific(idx, q, currentSolverConfig);
+        if (!result?.success) {
+          broadcastProgress({ status: 'error', current: idx + 1, message: `Không điền được câu ${idx + 1}: ${result?.error || 'Lỗi không xác định'}. Đã dừng để tránh bỏ câu.` });
+          break;
+        }
+        processedCount++;
 
         updateStorageState({
           completedCount: processedCount,
@@ -219,7 +203,7 @@
           message: `Đã điền câu ${idx + 1}/${totalQuestions}`
         });
 
-        await sleep(currentSolverConfig.fastMode ? 350 : 800);
+        await sleep(currentSolverConfig.fastMode ? 300 : 700);
       }
 
       finishSolver(totalQuestions, processedCount);
@@ -237,12 +221,15 @@
         message: `Đang quét câu ${loopIdx + 1}/${totalQuestions}...`
       });
 
-      const scanResult = await waitForNextQuestion(lastProcessedText, 4500);
+      const scanResult = await waitForNextQuestion(lastProcessedText, 5000);
 
       if (!scanResult || !scanResult.questions || scanResult.questions.length === 0) {
         consecutiveErrors++;
+        console.warn(`[AutoSolver Engine] Quét câu hỏi chưa có kết quả (lần ${consecutiveErrors}/${MAX_ERRORS}).`);
+        // Try scrolling down to trigger lazy loading
+        try { window.scrollBy(0, 300); } catch (_) {}
         if (consecutiveErrors >= MAX_ERRORS) {
-          console.warn('[AutoSolver Engine] Đạt giới hạn lỗi quét câu hỏi.');
+          console.warn('[AutoSolver Engine] Đạt giới hạn thử quét câu hỏi. Tạm dừng.');
           break;
         }
         await sleep(1000);
@@ -294,30 +281,13 @@
           message: `Đã điền câu ${displayNum}/${totalQuestions}`
         });
       } else {
-        // Onimi/9Router chập chờn 1 câu KHÔNG được dừng cả loạt (fix lỗi "chạy vài câu rồi tắt"):
-        // đếm lỗi liên tiếp, thử chuyển câu để chạy tiếp; chỉ dừng khi lỗi quá nhiều.
-        consecutiveErrors++;
         broadcastProgress({
-          status: 'warn',
+          status: 'error',
           current: displayNum,
           total: totalQuestions,
-          message: `⚠️ Chưa điền được câu ${displayNum}: ${solveResult?.error || 'không rõ lý do'}. Bỏ qua, chạy tiếp câu sau... (${consecutiveErrors}/${MAX_ERRORS})`
+          message: `Không điền được câu ${displayNum}: ${solveResult?.error || 'Lỗi không xác định'}. Đã dừng để tránh bỏ câu.`
         });
-        console.warn('[AutoSolver Engine] Bỏ qua câu', displayNum, 'lý do:', solveResult?.error);
-        if (consecutiveErrors >= MAX_ERRORS) {
-          break;
-        }
-        await sleep(1500);
-        if (currentSolverConfig.autoNext && loopIdx < totalQuestions - 1) {
-          try {
-            const navSkip = typeof navigateNext === 'function' ? navigateNext() : null;
-            if (navSkip && !navSkip.success) {
-              console.warn('[AutoSolver Engine] Không thể chuyển tiếp sau câu lỗi:', navSkip.error);
-            }
-            await sleep(currentSolverConfig.fastMode ? 600 : 1200);
-          } catch (_) {}
-        }
-        continue;
+        break;
       }
 
       updateStorageState({
@@ -327,10 +297,9 @@
         lastAnswer: solveResult?.answer || null
       });
 
-      // Navigate to next question if enabled and not on last question
-      if (currentSolverConfig.autoNext && loopIdx < totalQuestions - 1) {
-        // Điền đã được xác nhận ở trên — chờ thêm để React SPA kịp commit state trước khi điều hướng
-        await sleep(currentSolverConfig.fastMode ? 600 : 1000);
+      // Navigate to next question if not on last question
+      if (loopIdx < totalQuestions - 1) {
+        await sleep(currentSolverConfig.fastMode ? 350 : 700);
 
         broadcastProgress({
           status: 'navigating',
@@ -339,16 +308,41 @@
           message: `Chuyển sang câu ${displayNum + 1}...`
         });
 
-        const navResult = typeof navigateNext === 'function' ? navigateNext() : { error: 'No navigateNext' };
-        if (!navResult?.success) {
-          console.warn('[AutoSolver Engine] Không thể chuyển tiếp:', navResult?.error);
+        // Navigation with up to 3 retries
+        let navSuccess = false;
+        let navResult = typeof navigateNext === 'function' ? navigateNext() : { error: 'No navigateNext' };
+        if (navResult?.success) {
+          navSuccess = true;
+        } else {
+          // Retry 1: Scroll to bottom in case next button is below fold
+          try { window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); } catch (_) {}
+          await sleep(500);
+          navResult = typeof navigateNext === 'function' ? navigateNext() : { error: 'No navigateNext' };
+          if (navResult?.success) {
+            navSuccess = true;
+          } else {
+            // Retry 2: Wait 800ms and try one more time
+            await sleep(800);
+            navResult = typeof navigateNext === 'function' ? navigateNext() : { error: 'No navigateNext' };
+            if (navResult?.success) navSuccess = true;
+          }
+        }
+
+        if (!navSuccess) {
+          console.warn('[AutoSolver Engine] Không tìm thấy nút chuyển câu sau 3 lần thử:', navResult?.error);
+          broadcastProgress({
+            status: 'warn',
+            current: displayNum,
+            total: totalQuestions,
+            message: `⚠️ Không tìm thấy nút chuyển tiếp sau câu ${displayNum}. Dừng lại.`
+          });
           break;
         }
 
-        await sleep(currentSolverConfig.fastMode ? 600 : 1200);
+        await sleep(currentSolverConfig.fastMode ? 500 : 1000);
       } else {
-        await sleep(800);
-        break; // Single question or autoNext disabled
+        await sleep(600);
+        break; // Finished last question
       }
     }
 
@@ -408,14 +402,26 @@
       const refContext = config.refContext || (typeof capturePageContent === 'function' ? capturePageContent() : '');
 
       const aiResponse = await new Promise(resolve => {
-        chrome.runtime.sendMessage({
-          type: 'ASK_GEMINI',
-          question: q.questionText,
-          options: qOptions,
-          questionType: q.questionType,
-          slideContext: refContext,
-          fastMode: config.fastMode !== false
-        }, resolve);
+        const timer = setTimeout(() => {
+          resolve({ error: 'AI request timed out after 25s' });
+        }, 25000);
+
+        try {
+          chrome.runtime.sendMessage({
+            type: 'ASK_GEMINI',
+            question: q.questionText,
+            options: qOptions,
+            questionType: q.questionType,
+            slideContext: refContext,
+            fastMode: config.fastMode !== false
+          }, (res) => {
+            clearTimeout(timer);
+            resolve(res || { error: 'Empty response from AI engine' });
+          });
+        } catch (err) {
+          clearTimeout(timer);
+          resolve({ error: err.message });
+        }
       });
 
       if (aiResponse?.error) {
@@ -424,7 +430,7 @@
       }
 
       const answer = aiResponse.answer;
-      const isMultiTF = q.isMultiStatement || (q.questionType === 'true-false' && qOptions && qOptions.length >= 2);
+      const isMultiTF = q.isMultiStatement || (q.questionType === 'true-false' && qOptions && qOptions.length >= 2 && !isOnlyTrueFalseWords(qOptions));
       const isChoice = (q.questionType === 'multiple-choice' || q.questionType === 'multiple-select' || (q.questionType === 'true-false' && !isMultiTF));
       const letter = isChoice ? (typeof extractAnswerLetter === 'function' ? extractAnswerLetter(answer) : '') : null;
 
@@ -440,30 +446,14 @@
         });
       } catch (_) {}
 
-      // Fill Answer directly into the page DOM — thử tối đa 3 lần, KHÔNG báo thành công suông
-      if (typeof fillAnswer === 'function') {
-        let fillRes = await fillAnswer(domIndex, answer, letter);
-
-        if (!fillRes?.success) {
-          await sleep(500);
-          fillRes = await fillAnswer(domIndex, answer, letter);
-        }
-
-        if (!fillRes?.success) {
-          await sleep(700);
-          fillRes = await fillAnswer(domIndex, answer, letter);
-        }
-
-        if (!fillRes?.success) {
-          console.warn('[AutoSolver Engine] Điền thất bại sau 3 lần thử:', fillRes?.error);
-          return {
-            success: false,
-            error: fillRes?.error || 'Điền đáp án thất bại sau 3 lần thử.',
-            answer,
-            answerLetter: letter
-          };
-        }
+      // Fill Answer directly into the page DOM
+      if (typeof fillAnswer !== 'function') return { success: false, error: 'Bộ điền đáp án chưa tải.' };
+      let fillRes = await fillAnswer(domIndex, answer, letter);
+      if (!fillRes?.success) {
+        await sleep(350);
+        fillRes = await fillAnswer(domIndex, answer, letter);
       }
+      if (!fillRes?.success) return { success: false, error: fillRes?.error || 'Không thể điền đáp án.' };
 
       return {
         success: true,
